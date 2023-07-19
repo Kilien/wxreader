@@ -200,19 +200,22 @@ if __name__=='__main__':
         book_id = book[0]
         book_name = book[1]
 
-        # 失败重试，最大重试次数为4
-        for try_count in range(4):
+        # 失败重试，最大重试次数为3
+        for try_count in range(3):
             try:
                 pbar.set_description("正在导出笔记【{}】".format(book_name))
                 notes = get_mythought(book_id, HEADERS)
+                if (len(notes) == 0):
+                    pbar.set_description("【{}】无想法".format(book_name))
+                    break
                 with open(note_dir + book_name + '.md', 'w', encoding='utf-8') as f:
                     f.write(notes)
 
                 # 写入成功后跳出循环，防止重复写入
                 break
-            except:
+            except Exception as e:
                 # 忽略异常，直接重试
                 pbar.set_description("获取笔记【{}】失败，开始第{}次重试".format(book_name, try_count + 1))
-
+                print(f'caught {type(e)}: e')
                 # 等待3秒后再重试
                 time.sleep(3)

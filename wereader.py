@@ -72,73 +72,59 @@ def get_mythought(bookId, headers):
     else:
         url = "https://i.weread.qq.com/review/list?bookId=" + bookId + "&listType=11&mine=1&synckey=0&listMode=0"
         data = request_data(url, headers)
-        # print(headers)
         # return 
-    """遍历所有想法并添加到字典储存起来
-    thoughts = {30: {7694: '...',122:'...'}, 16: {422: '...',}, 12: {788: '...',}}
-    """
-    thoughts = defaultdict(dict)
-    MAX = 1000000000
-    for item in data['reviews']:
-        #获取想法所在章节id
-        chapterUid = item['review']['chapterUid']
-        #获取原文内容
-        abstract = item['review']['abstract']
-        #获取想法
-        text = item['review']['content']
-        #获取想法开始位置
-        try:
-            text_positon = int(item['review']['range'].split('-')[0])
-        except:
-            #处理在章末添加想法的情况(将位置设置为一个很大的值)
-            text_positon = MAX + int(item['review']['createTime'])
-        #以位置为键，以标注为值添加到字典中,获得{chapterUid:{text_positon:"text分开想法和原文内容abstract"}}
-        thoughts[chapterUid][text_positon] = text + '分开想法和原文内容' + abstract
-    
-    """章节内想法按range排序
-    thoughts_sorted_range = 
-    {30: [(7694, '....')], 16: [(422, '...')], 12: [(788, '...')]}
-    """
-    thoughts_sorted_range = defaultdict(list)
-    #每一章内的想法按想法位置排序
-    for chapterUid in thoughts.keys():
-        thoughts_sorted_range[chapterUid] = sorted(thoughts[chapterUid].items())
-    
-    """章节按id排序
-    sorted_thoughts = 
-    [(12, [(788, '...')]), (16, [(422, '...')]), (30, [(7694, '...')])]
-    """
-    sorted_thoughts = sorted(thoughts_sorted_range.items())
-    
-    """获取包含目录级别的目录数据"""
-    #获取包含目录级别的全书目录[(chapterUid,level,'title')]
-    sorted_chapters = get_sorted_chapters(bookId, headers)
-    #去除没有想法的目录项
-    d_sorted_chapters = []
-    for chapter in sorted_chapters:
-        if chapter[0] in thoughts_sorted_range.keys():
-            d_sorted_chapters.append(chapter)
 
-    chapter_level = {1: '## ', 2:'### ', '3': '#### '}
+    chapter_list = get_sorted_chapters(bookId, headers)
+
+    thoughts_list = []
+    for item in data['reviews']:
+        title = '完书想法'
+        level = 2
+        chapterUid = 99999
+        abstract = ''
+        
+        # 判断是否有摘要字段
+        if ('abstract' in item['review']):
+            # 摘要为空
+            if (len(item['review']['abstract']) != 0):
+              #获取想法所在章节id
+              chapterUid = item['review']['chapterUid']
+              #获取原文内容
+              abstract = item['review']['abstract']
+        else:
+            chapterUid = 99999
+            abstract = ''
+
+        #获取标题
+        for id, chapter in enumerate(chapter_list):
+            if (chapter['chapterUid'] == chapterUid):
+                title = chapter['title']
+                level = chapter['level']
+                
+        #获取想法
+        content = item['review']['content']
+        
+        # print('title..'+title)
+        thoughts_list.append({'chapterUid':chapterUid, 'title':title, 'level':level, 'abstract':abstract, 'content':content})
     
-    """生成想法"""
-    for i in range(len(sorted_thoughts)):
-        counter = 1
-        res += chapter_level[d_sorted_chapters[i][1]] + d_sorted_chapters[i][2] + '\n\n'
-        for thought in sorted_thoughts[i][1]:
-            text_and_abstract = thought[1].split('分开想法和原文内容')
-            #如果为章末发布的标注（不包含 abstract 的标注）
-            if text_and_abstract[1] == '':
-                text_and_abstract[1] = "章末想法" + str(counter)
-                counter = counter + 1
-            res += "> " + text_and_abstract[1] + '\n\n' + "```\n" + text_and_abstract[0] + "\n```" + '\n\n'
-    if res.strip() == '':
-        print('无想法')
+    # 根据章节重新排序
+    new_thoughts = sorted(thoughts_list, key=lambda x:x['chapterUid'], reverse=False)
+    chapters_map = {1: "## ", 2: "### ", 3: "#### "}
+    
+    for k,it in enumerate(new_thoughts):
+        # 标题
+        res += chapters_map[it['level']] + it['title'] + '\n\n'
+        # 摘要
+        if (len(it['abstract']) != 0):
+            res += "> " + it['abstract'] + '\n\n' 
+        # 想法
+        res += "```\n" + it['content'] + "\n```" + '\n\n'
     return res
 
 """
 (按顺序)获取书中的章节：
-[(1, 1, '封面'), (2, 1, '版权信息'), (3, 1, '数字版权声明'), (4, 1, '版权声明'), (5, 1, '献给'), (6, 1, '前言'), (7, 1, '致谢')]
+[{'chapterUid': 1, 'level': 1, 'title': '封面'}
+{'chapterUid': 153, 'level': 1, 'title': '版权信息'}]
 """
 def get_sorted_chapters(bookId, headers):
     if '_' in bookId:
@@ -151,10 +137,9 @@ def get_sorted_chapters(bookId, headers):
     for item in data['data'][0]['updated']:
         #判断item是否包含level属性。
         try:
-            chapters.append((item['chapterUid'],item['level'],item['title']))
+            chapters.append({"chapterUid":item['chapterUid'],"level":item['level'],"title":item['title']})
         except:
-            chapters.append((item['chapterUid'],1,item['title']))
-    """chapters = [(1, 1, '封面'), (2, 1, '版权信息'), (3, 1, '数字版权声明'), (4, 1, '版权声明'), (5, 1, '献给'), (6, 1, '前言'), (7, 1, '致谢')]"""
+            chapters.append({"chapterUid":item['chapterUid'],"level":1,"title":item['title']})
     return chapters
 
 

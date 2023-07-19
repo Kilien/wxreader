@@ -148,12 +148,12 @@ if __name__=='__main__':
         if login_success(headers_from_file):
             print('登录微信读书成功!')
             #登录成后更新headers
-            headers = headers_from_file
+            HEADERS = headers_from_file
             # headers_p.update(Cookie=cookie_in_file[0])
             #获取用户user_vid
             for item in cookie_in_file[0].split(';'):
                 if item.strip()[:6] == 'wr_vid':
-                    USERVID = int(item.strip()[7:])
+                    USER_VID = int(item.strip()[7:])
         else:
             app = QApplication(sys.argv) # 创建应用
             window = MainWindow() # 创建主窗口
@@ -204,8 +204,8 @@ if __name__=='__main__':
         for try_count in range(4):
             try:
                 pbar.set_description("正在导出笔记【{}】".format(book_name))
-                notes = get_bookmarklist(book[0], HEADERS)
-                with open(note_dir + book_name + '.txt', 'w', encoding='utf-8') as f:
+                notes = get_mythought(book_id, HEADERS)
+                with open(note_dir + book_name + '.md', 'w', encoding='utf-8') as f:
                     f.write(notes)
 
                 # 写入成功后跳出循环，防止重复写入

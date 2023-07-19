@@ -32,15 +32,10 @@ Book = namedtuple('Book', ['bookId', 'title', 'author', 'cover'])
 
 def get_bookmarklist(bookId, headers):
     """获取某本书的笔记返回md文本"""
-    url = "https://i.weread.qq.com/book/bookmarklist"
-    params = dict(bookId=bookId)
-    r = requests.get(url, params=params, headers=headers, verify=False)
+    url = "https://i.weread.qq.com/book/bookmarklists?bookId=" + bookId
 
-    if r.ok:
-        data = r.json()
-        # clipboard.copy(json.dumps(data, indent=4, sort_keys=True))
-    else:
-        raise Exception(r.text)
+    data = request_data(url, headers)
+
     chapters = {c['chapterUid']: c['title'] for c in data['chapters']}
     contents = defaultdict(list)
 
@@ -62,6 +57,105 @@ def get_bookmarklist(bookId, headers):
         res += '\n'
 
     return res
+
+"""
+(按顺序)获取书中的所有个人想法(Markdown格式,含原文,标题分级,想法前后缀)
+"""
+def get_mythought(bookId, headers):
+    res = ''
+    """获取数据"""
+    if '_' in bookId:
+        url = 'https://i.weread.qq.com/review/list?listtype=6&mine=1&bookId=' + bookId + '&synckey=0&listmode=0'
+        data = request_data(url, headers)
+        print('公众号暂时不支持获取想法')
+        return ''
+    else:
+        url = "https://i.weread.qq.com/review/list?bookId=" + bookId + "&listType=11&mine=1&synckey=0&listMode=0"
+        data = request_data(url, headers)
+        # print(headers)
+        # return 
+    """遍历所有想法并添加到字典储存起来
+    thoughts = {30: {7694: '...',122:'...'}, 16: {422: '...',}, 12: {788: '...',}}
+    """
+    thoughts = defaultdict(dict)
+    MAX = 1000000000
+    for item in data['reviews']:
+        #获取想法所在章节id
+        chapterUid = item['review']['chapterUid']
+        #获取原文内容
+        abstract = item['review']['abstract']
+        #获取想法
+        text = item['review']['content']
+        #获取想法开始位置
+        try:
+            text_positon = int(item['review']['range'].split('-')[0])
+        except:
+            #处理在章末添加想法的情况(将位置设置为一个很大的值)
+            text_positon = MAX + int(item['review']['createTime'])
+        #以位置为键，以标注为值添加到字典中,获得{chapterUid:{text_positon:"text分开想法和原文内容abstract"}}
+        thoughts[chapterUid][text_positon] = text + '分开想法和原文内容' + abstract
+    
+    """章节内想法按range排序
+    thoughts_sorted_range = 
+    {30: [(7694, '....')], 16: [(422, '...')], 12: [(788, '...')]}
+    """
+    thoughts_sorted_range = defaultdict(list)
+    #每一章内的想法按想法位置排序
+    for chapterUid in thoughts.keys():
+        thoughts_sorted_range[chapterUid] = sorted(thoughts[chapterUid].items())
+    
+    """章节按id排序
+    sorted_thoughts = 
+    [(12, [(788, '...')]), (16, [(422, '...')]), (30, [(7694, '...')])]
+    """
+    sorted_thoughts = sorted(thoughts_sorted_range.items())
+    
+    """获取包含目录级别的目录数据"""
+    #获取包含目录级别的全书目录[(chapterUid,level,'title')]
+    sorted_chapters = get_sorted_chapters(bookId, headers)
+    #去除没有想法的目录项
+    d_sorted_chapters = []
+    for chapter in sorted_chapters:
+        if chapter[0] in thoughts_sorted_range.keys():
+            d_sorted_chapters.append(chapter)
+
+    chapter_level = {1: '## ', 2:'### ', '3': '#### '}
+    
+    """生成想法"""
+    for i in range(len(sorted_thoughts)):
+        counter = 1
+        res += chapter_level[d_sorted_chapters[i][1]] + d_sorted_chapters[i][2] + '\n\n'
+        for thought in sorted_thoughts[i][1]:
+            text_and_abstract = thought[1].split('分开想法和原文内容')
+            #如果为章末发布的标注（不包含 abstract 的标注）
+            if text_and_abstract[1] == '':
+                text_and_abstract[1] = "章末想法" + str(counter)
+                counter = counter + 1
+            res += "> " + text_and_abstract[1] + '\n\n' + "```\n" + text_and_abstract[0] + "\n```" + '\n\n'
+    if res.strip() == '':
+        print('无想法')
+    return res
+
+"""
+(按顺序)获取书中的章节：
+[(1, 1, '封面'), (2, 1, '版权信息'), (3, 1, '数字版权声明'), (4, 1, '版权声明'), (5, 1, '献给'), (6, 1, '前言'), (7, 1, '致谢')]
+"""
+def get_sorted_chapters(bookId, headers):
+    if '_' in bookId:
+        print('公众号不支持输出目录')
+        return ''
+    url = "https://i.weread.qq.com/book/chapterInfos?" + "bookIds=" + bookId + "&synckeys=0"
+    data = request_data(url, headers)
+    chapters = []
+    #遍历章节,章节在数据中是按顺序排列的，所以不需要另外排列
+    for item in data['data'][0]['updated']:
+        #判断item是否包含level属性。
+        try:
+            chapters.append((item['chapterUid'],item['level'],item['title']))
+        except:
+            chapters.append((item['chapterUid'],1,item['title']))
+    """chapters = [(1, 1, '封面'), (2, 1, '版权信息'), (3, 1, '数字版权声明'), (4, 1, '版权声明'), (5, 1, '献给'), (6, 1, '前言'), (7, 1, '致谢')]"""
+    return chapters
 
 
 def get_bestbookmarks(bookId, headers):
@@ -200,4 +294,11 @@ def login_success(headers):
     else:
         return False
 
-
+def request_data(url, headers):
+    """由url请求数据"""
+    r = requests.get(url,headers=headers,verify=False)
+    if r.ok:
+        data = r.json()
+    else:
+        raise Exception(r.text)
+    return data

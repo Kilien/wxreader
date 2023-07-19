@@ -1,0 +1,8 @@
+requests
+clipboard
+xlutils
+xlrd
+xlwt
+tqdm
+PyQt5
+PyQtWebEngine

@@ -204,7 +204,7 @@ if __name__=='__main__':
         for try_count in range(3):
             try:
                 pbar.set_description("正在导出笔记【{}】".format(book_name))
-                notes = get_mythought(book_id, HEADERS)
+                notes = get_bookmarklist(book_id, HEADERS)
                 if (len(notes) == 0):
                     pbar.set_description("【{}】无想法".format(book_name))
                     break

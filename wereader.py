@@ -32,7 +32,7 @@ Book = namedtuple('Book', ['bookId', 'title', 'author', 'cover'])
 
 def get_bookmarklist(bookId, headers):
     """获取某本书的笔记返回md文本"""
-    url = "https://i.weread.qq.com/book/bookmarklists?bookId=" + bookId
+    url = "https://i.weread.qq.com/book/bookmarklist?bookId=" + bookId
 
     data = request_data(url, headers)
 
@@ -43,7 +43,6 @@ def get_bookmarklist(bookId, headers):
         # for item in data['updated']:
         chapter = item['chapterUid']
         text = item['markText']
-        create_time = item["createTime"]
         start = int(item['range'].split('-')[0])
         contents[chapter].append((start, text))
 
@@ -160,7 +159,7 @@ def get_bestbookmarks(bookId, headers):
         text = item['markText']
         contents[chapter].append(text)
 
-    chapters_map = {title: level for level, title in get_chapters(int(bookId))}
+    chapters_map = {title: level for level, title in get_chapters(int(bookId) , headers)}
     res = ''
     for c in chapters:
         title = chapters[c]
@@ -180,7 +179,7 @@ def get_chapters(bookId, headers):
 
     if r.ok:
         data = r.json()
-        clipboard.copy(json.dumps(data, indent=4, sort_keys=True))
+        # clipboard.copy(json.dumps(data, indent=4, sort_keys=True))
     else:
         raise Exception(r.text)
 
